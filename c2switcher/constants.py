@@ -1,0 +1,43 @@
+"""Shared constants for the c2switcher package."""
+
+import os
+from pathlib import Path
+
+from .presentation.console import console
+
+__all__ = ['console']
+
+
+# Paths — Windows: use %APPDATA%\c2switcher for the database/state,
+# but keep ~/.claude for credentials (Claude Code uses this on all platforms).
+_appdata = os.environ.get('APPDATA')
+C2SWITCHER_DIR = Path(_appdata) / 'c2switcher' if _appdata else Path.home() / '.c2switcher'
+
+DB_PATH = C2SWITCHER_DIR / 'store.db'
+LOCK_PATH = C2SWITCHER_DIR / '.lock'
+HEADERS_PATH = C2SWITCHER_DIR / 'headers.json'
+CLAUDE_DIR = Path.home() / '.claude'
+CREDENTIALS_PATH = CLAUDE_DIR / '.credentials.json'
+LB_STATE_PATH = C2SWITCHER_DIR / 'load_balancer_state.json'
+THEME_PREF_PATH = C2SWITCHER_DIR / 'theme.json'
+
+# Load balancer tuning parameters
+SIMILAR_DRAIN_THRESHOLD = 0.05  # %/hour margin to consider accounts interchangeable
+CACHE_TTL_SECONDS = 300  # accept cache up to this age (5 minutes)
+STALE_CACHE_SECONDS = 60  # refresh stale cache if needed (for high-drain accounts)
+HIGH_DRAIN_REFRESH_THRESHOLD = 1.0  # %/hour that warrants a fresh usage pull
+FIVE_HOUR_PENALTIES = [
+    (90.0, 0.5),
+    (85.0, 0.7),
+    (80.0, 0.85),
+]
+FIVE_HOUR_ROTATION_CAP = 90.0  # avoid round robin entries above this 5h util
+BURST_THRESHOLD = 94.0  # skip accounts whose expected burst would exceed this
+DEFAULT_BURST_BUFFER = 4.0  # fallback burst size when history is sparse
+LOW_USAGE_BONUS_CAP = 60.0  # upper bound for low-util bonus to taper
+LOW_USAGE_BONUS_FLOOR = 20.0  # treat anything below as min util for bonus math
+LOW_USAGE_BONUS_GAIN = 5.0  # max %/hour boost awarded to low-util accounts
+SONNET_BONUS_THRESHOLD = 85.0  # sonnet under this keeps bonus enabled
+SONNET_PACE_GATE = 90.0  # enable pace alignment once sonnet is hot
+SONNET_PENALTY_THRESHOLD = 95.0  # sonnet over this incurs penalty
+SONNET_HIGH_UTIL_PENALTY = 2.0  # fixed %/hour penalty for overheated sonnet

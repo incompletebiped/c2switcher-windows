@@ -1,0 +1,47 @@
+[build-system]
+requires = ["setuptools>=67", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "c2switcher"
+version = "1.1.0"
+description = "Claude Code Account Switcher - Windows edition with system tray"
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+    "click>=8.1.0",
+    "rich>=13.0.0",
+    "requests>=2.31.0",
+    "psutil>=5.9.0",
+    "filelock>=3.12.0",
+    "pandas>=1.5.0",
+    "numpy>=1.23.0",
+    "matplotlib>=3.7.0",
+    # Windows tray
+    "pystray>=0.19.5",
+    "PySide6>=6.6.0",
+    "Pillow>=10.0.0",
+]
+
+[project.scripts]
+c2switcher = "c2switcher.__main__:main"
+
+[project.optional-dependencies]
+build = ["pyinstaller>=6.0.0"]
+
+[tool.setuptools.packages.find]
+where = ["."]
+
+[tool.setuptools]
+include-package-data = true
+
+[tool.black]
+line-length = 120
+target-version = ["py310"]
+skip-string-normalization = true
+
+[tool.ruff]
+line-length = 120
+
+[tool.ruff.format]
+quote-style = "single"
