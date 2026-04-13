@@ -60,19 +60,26 @@ class TrayApp:
         self._bridge.new_account_detected.connect(self._on_new_account)
         self._bridge.auto_switched.connect(self._on_auto_switched)
 
-        # Monitor (daemon thread)
+        # Monitor (daemon thread) — created here but started from the pystray
+        # setup callback so it never fires before pystray's win32 backend is ready.
         self._monitor = TrayMonitor(
             on_data_updated=lambda data: self._bridge.data_updated.emit(data),
             on_processing_changed=lambda active: self._bridge.processing_changed.emit(active),
             on_new_account_detected=lambda: self._bridge.new_account_detected.emit(),
             on_auto_switched=lambda: self._bridge.auto_switched.emit(),
         )
-        self._monitor.start()
 
-        # pystray icon (runs on its own thread)
+        # pystray icon — start it first; monitor starts inside setup() once
+        # pystray has registered the tray icon and set _running = True.
+        # This prevents the first icon update from being silently dropped.
         self._icon = self._build_pystray_icon()
+
+        def _pystray_setup(icon):
+            icon.visible = True
+            self._monitor.start()
+
         icon_thread = threading.Thread(
-            target=self._icon.run,
+            target=lambda: self._icon.run(setup=_pystray_setup),
             daemon=True,
             name='c2s-tray-icon',
         )

@@ -34,7 +34,7 @@ from .widgets import (
 )
 
 
-POPUP_WIDTH = 400
+POPUP_WIDTH = 480
 
 
 class TrayPopup(QWidget):
@@ -79,6 +79,7 @@ class TrayPopup(QWidget):
         if self._header:
             self._header.set_processing(active)
 
+    @Slot()
     def toggle(self):
         """Show near tray or hide if already visible."""
         if self.isVisible():
@@ -208,12 +209,30 @@ class TrayPopup(QWidget):
         if old:
             old.deleteLater()
 
-        # Compute height: header(~40) + sep(1) + content
-        content_h = content.sizeHint().height()
+        # Compute height from known fixed component sizes rather than sizeHint()
+        # (sizeHint is unreliable before the widget is painted inside a QScrollArea)
+        n = len(accounts)
+        content_h = (
+            36        # UsageBar "Sonnet 7d" (label + bar + margins)
+            + 6       # spacing
+            + 36      # UsageBar "Overall 7d"
+            + 6       # spacing
+            + 22      # LegendRow
+            + 6       # spacing
+            + 1       # separator
+            + 6       # spacing
+            + n * 56  # account cards (approx 56px each)
+            + (n - 1) * 6  # spacing between cards
+            + 14      # vl top+bottom margins
+        )
         screen_h = QApplication.primaryScreen().availableGeometry().height()
-        max_h = int(screen_h * 0.7)
-        total_h = min(40 + 1 + content_h + 16, max_h)
+        max_h = int(screen_h * 0.80)
+        # 40 header + 1 separator + content
+        total_h = min(41 + content_h, max_h)
         self.setFixedHeight(max(total_h, 200))
+        # Re-anchor to tray corner if popup is currently visible
+        if self.isVisible():
+            self._position_near_tray()
 
     # ── Slots ─────────────────────────────────────────────────────────────────
 

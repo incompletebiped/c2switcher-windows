@@ -25,7 +25,6 @@ a = Analysis(
         'PySide6.QtCore',
         'PySide6.QtGui',
         'PySide6.QtWidgets',
-        'PySide6.QtSvg',
         # pystray backends
         'pystray._win32',
         # PIL / Pillow

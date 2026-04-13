@@ -616,7 +616,8 @@ class AccountCard(QWidget):
         return super().eventFilter(obj, event)
 
     def mousePressEvent(self, event):
-        if not self._account.get('needs_reauth') and not self._session_active:
+        # Manual card clicks always work — only the optimal button locks during processing
+        if not self._account.get('needs_reauth'):
             index = self._account.get('index', self._array_idx + 1)
             _run_service(_svc_switch, index, on_done=self.action_requested.emit)
         super().mousePressEvent(event)
@@ -746,12 +747,15 @@ class HeaderBar(QWidget):
 
     def update_theme(self, theme: dict):
         self._theme = theme
-        # Rebuild the layout on theme change is simplest
-        layout = self.layout()
-        while layout.count():
-            child = layout.takeAt(0)
-            if child.widget():
-                child.widget().deleteLater()
+        # Delete the old layout and all its children, then rebuild
+        old_layout = self.layout()
+        if old_layout:
+            while old_layout.count():
+                child = old_layout.takeAt(0)
+                if child.widget():
+                    child.widget().deleteLater()
+            from PySide6.QtWidgets import QWidget as _QW
+            _QW().setLayout(old_layout)  # reparent old layout so it gets collected
         self._build_ui()
 
     @staticmethod

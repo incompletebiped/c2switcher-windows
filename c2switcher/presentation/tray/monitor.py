@@ -184,6 +184,24 @@ def _fetch_usage_data() -> list[dict]:
     return results
 
 
+def _try_import_credentials() -> bool:
+    """Try to import the current credentials file as a new account.
+
+    Returns True if an account was added or updated.
+    """
+    try:
+        cred_path = CREDENTIALS_PATH
+        if not cred_path.exists():
+            return False
+        creds_json = cred_path.read_text(encoding='utf-8')
+        with ServiceFactory() as factory:
+            account_svc = factory.get_account_service()
+            _account, is_new = account_svc.add_account(creds_json)
+            return True
+    except Exception:
+        return False
+
+
 def _do_auto_switch():
     """Switch to the optimal account via the service layer."""
     try:
@@ -256,6 +274,10 @@ class TrayMonitor:
     # ── Main loop ─────────────────────────────────────────────────────────────
 
     def _run(self):
+        # On first launch, if credentials exist but no accounts are registered,
+        # auto-import so the user doesn't have to run `c2switcher add` manually.
+        _try_import_credentials()
+
         # Initial fetch
         self._do_refresh()
 
@@ -332,10 +354,12 @@ class TrayMonitor:
         self._on_data_updated(data)
 
     def _check_for_new_login(self):
-        """Compare current refresh token to last known — fire callback if different."""
+        """Compare current refresh token to last known — import if different."""
         new_token = _read_refresh_token(CREDENTIALS_PATH)
         if new_token and new_token != self._last_known_refresh_token:
             self._last_known_refresh_token = new_token
+            # Actually import the account into the database
+            _try_import_credentials()
             if self._on_new_account_detected:
                 self._on_new_account_detected()
             # Refresh data so the new account shows up

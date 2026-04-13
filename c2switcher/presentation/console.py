@@ -1,9 +1,14 @@
 """Shared console instance for c2switcher output.
 
-This module provides a single Rich Console instance configured to write to stderr.
-Using stderr ensures output doesn't interfere with stdout-based integrations.
+CLI mode: writes to stderr so output doesn't interfere with stdout integrations.
+Tray mode: quiet=True suppresses all output AND skips Windows console API calls
+(SetConsoleMode / GetStdHandle) that would flash a console window in a windowed exe.
 """
 
+import os
 from rich.console import Console
 
-console = Console(stderr=True)
+if os.environ.get('C2SWITCHER_TRAY_MODE'):
+    console = Console(quiet=True)
+else:
+    console = Console(stderr=True)

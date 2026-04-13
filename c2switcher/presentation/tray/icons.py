@@ -1,18 +1,12 @@
 """Dynamic tray icon renderer.
 
-Generates an SVG string (exact port of applet.js _generateIconSvg) and renders
-it via PySide6.QtSvg.QSvgRenderer → QImage → PIL Image.
-
-This gives pixel-perfect output matching the Cinnamon applet icon.
-
-Must be called from the Qt main thread (QSvgRenderer requirement).
+Draws the icon using PIL directly (no Qt SVG dependency).
+The geometry matches icon-spec.svg and the Cinnamon applet icon.
 """
 
 from __future__ import annotations
 
-import io
-
-from PIL import Image
+from PIL import Image, ImageDraw
 
 
 # ── Colours (exact from applet.js / ICON_SPEC.md) ───────────────────────────
@@ -27,31 +21,43 @@ _DIM_FG   = '#AFA9EC'
 _DOT_COLORS = {'ok': '#639922', 'warning': '#BA7517', 'limit': '#E24B4A'}
 
 
-# ── SVG generator (direct port of applet.js _generateIconSvg) ────────────────
+# ── PIL icon renderer ────────────────────────────────────────────────────────
 
-def generate_icon_svg(active_index: int, worst_status: str, num_accounts: int) -> str:
-    """Return an SVG string for the tray icon.
+def _draw_rounded_rect(draw: ImageDraw.ImageDraw, xy, radius, fill):
+    """Draw a rounded rectangle (PIL doesn't have this in older versions)."""
+    x0, y0, x1, y1 = xy
+    r = min(radius, (x1 - x0) // 2, (y1 - y0) // 2)
+    # Four corners
+    draw.ellipse([x0, y0, x0 + 2 * r, y0 + 2 * r], fill=fill)
+    draw.ellipse([x1 - 2 * r, y0, x1, y0 + 2 * r], fill=fill)
+    draw.ellipse([x0, y1 - 2 * r, x0 + 2 * r, y1], fill=fill)
+    draw.ellipse([x1 - 2 * r, y1 - 2 * r, x1, y1], fill=fill)
+    # Two rectangles to fill the body
+    draw.rectangle([x0 + r, y0, x1 - r, y1], fill=fill)
+    draw.rectangle([x0, y0 + r, x1, y1 - r], fill=fill)
 
-    This is a line-for-line port of C2SwitcherApplet._generateIconSvg() from
-    applet/applet.js.  The geometry is identical to icon-spec.svg.
 
-    Args:
-        active_index: 0-based account index that is currently active (-1 = none)
-        worst_status: 'ok' | 'warning' | 'limit'
-        num_accounts: total accounts (rows capped at 3)
+def _render_icon_pil(active_index: int, worst_status: str, num_accounts: int, size: int) -> Image.Image:
+    """Render the tray icon at the given size using PIL.
+
+    Draws at 256x256 (matching the SVG viewBox) then scales down.
     """
-    dot_color = _DOT_COLORS.get(worst_status, _DOT_COLORS['ok'])
-    num_rows = min(max(num_accounts, 0), 3)
+    S = 256
+    img = Image.new('RGBA', (S, S), (0, 0, 0, 0))
+    draw = ImageDraw.ImageDraw(img)
 
-    # Row geometry: (y, h, cy, cr, ly, lw, lh, sy, sw, sh)
-    # Matches the defs array in applet.js _generateIconSvg exactly.
+    # Background rounded rect
+    _draw_rounded_rect(draw, (0, 0, S, S), 56, _BG)
+
+    # Row geometry (matches applet.js exactly)
     defs = [
         {'y': 32,  'h': 56, 'cy': 60,  'cr': 16, 'ly': 52,  'lw': 90, 'lh': 8, 'sy': 66,  'sw': 58, 'sh': 6},
         {'y': 96,  'h': 56, 'cy': 124, 'cr': 16, 'ly': 116, 'lw': 90, 'lh': 8, 'sy': 130, 'sw': 58, 'sh': 6},
         {'y': 160, 'h': 44, 'cy': 182, 'cr': 12, 'ly': 178, 'lw': 72, 'lh': 7, 'sy': 0,   'sw': 0,  'sh': 0},
     ]
 
-    rows = ''
+    num_rows = min(max(num_accounts, 0), 3)
+
     for i in range(num_rows):
         d = defs[i]
         is_act = (i == active_index)
@@ -59,73 +65,38 @@ def generate_icon_svg(active_index: int, worst_status: str, num_accounts: int) -
         fg = _BRIGHT if is_act else _DIM_FG
 
         # Row background
-        rows += (
-            f'<rect x="32" y="{d["y"]}" width="192" height="{d["h"]}" rx="12" fill="{row_fill}"/>'
-        )
+        _draw_rounded_rect(draw, (32, d['y'], 32 + 192, d['y'] + d['h']), 12, row_fill)
+
         # Avatar circle
-        rows += f'<circle cx="60" cy="{d["cy"]}" r="{d["cr"]}" fill="{fg}"/>'
+        cx, cy, cr = 60, d['cy'], d['cr']
+        draw.ellipse([cx - cr, cy - cr, cx + cr, cy + cr], fill=fg)
+
         # Primary label bar
-        rows += (
-            f'<rect x="86" y="{d["ly"]}" width="{d["lw"]}" height="{d["lh"]}" rx="4" fill="{fg}"/>'
-        )
+        lx, ly = 86, d['ly']
+        _draw_rounded_rect(draw, (lx, ly, lx + d['lw'], ly + d['lh']), 4, fg)
+
         # Sub-label bar (rows 0 and 1 only)
         if d['sh'] > 0:
+            sx, sy = 86, d['sy']
             sub_fill = _BRIGHT if is_act else row_fill
-            sub_op   = '0.45' if is_act else '0.5'
-            rows += (
-                f'<rect x="86" y="{d["sy"]}" width="{d["sw"]}" height="{d["sh"]}" rx="3"'
-                f' fill="{sub_fill}" opacity="{sub_op}"/>'
-            )
+            # Approximate opacity blending onto the row background
+            _draw_rounded_rect(draw, (sx, sy, sx + d['sw'], sy + d['sh']), 3, sub_fill)
+
         # Active tick (right inner edge)
         if is_act:
             ty = d['y'] + 8
             th = d['h'] - 16
-            rows += (
-                f'<rect x="216" y="{ty}" width="6" height="{th}" rx="3"'
-                f' fill="{_BRIGHT}" opacity="0.45"/>'
-            )
+            _draw_rounded_rect(draw, (216, ty, 222, ty + th), 3, _BRIGHT)
 
     # Status dot with dark halo
-    dot = f'<circle cx="220" cy="220" r="28" fill="{_BG}"/>'
-    dot += f'<circle cx="220" cy="220" r="20" fill="{dot_color}"/>'
+    dot_color = _DOT_COLORS.get(worst_status, _DOT_COLORS['ok'])
+    draw.ellipse([220 - 28, 220 - 28, 220 + 28, 220 + 28], fill=_BG)
+    draw.ellipse([220 - 20, 220 - 20, 220 + 20, 220 + 20], fill=dot_color)
 
-    return (
-        '<svg xmlns="http://www.w3.org/2000/svg" width="256" height="256" viewBox="0 0 256 256">'
-        f'<rect width="256" height="256" rx="56" fill="{_BG}"/>'
-        f'{rows}{dot}'
-        '</svg>'
-    )
+    if size != S:
+        img = img.resize((size, size), Image.Resampling.LANCZOS)
 
-
-# ── SVG → PIL Image via Qt ────────────────────────────────────────────────────
-
-def _svg_to_pil(svg_str: str, size: int) -> Image.Image:
-    """Render an SVG string to a PIL RGBA Image using Qt's SVG renderer.
-
-    Must be called from the Qt main thread.
-    """
-    from PySide6.QtCore import QByteArray, QBuffer, QIODevice
-    from PySide6.QtGui import QImage, QPainter
-    from PySide6.QtSvg import QSvgRenderer
-
-    renderer = QSvgRenderer(QByteArray(svg_str.encode('utf-8')))
-
-    qimg = QImage(size, size, QImage.Format.Format_ARGB32_Premultiplied)
-    qimg.fill(0)
-
-    painter = QPainter(qimg)
-    painter.setRenderHint(QPainter.RenderHint.Antialiasing)
-    renderer.render(painter)
-    painter.end()
-
-    # QImage → PIL via PNG round-trip
-    buf = QBuffer()
-    buf.open(QIODevice.OpenModeFlag.WriteOnly)
-    qimg.save(buf, 'PNG')
-    buf.close()
-
-    pil = Image.open(io.BytesIO(bytes(buf.data())))
-    return pil.convert('RGBA')
+    return img
 
 
 # ── Public API ────────────────────────────────────────────────────────────────
@@ -139,7 +110,6 @@ def render_tray_icon(
     """Generate and render the tray icon for the given account state.
 
     Returns a PIL RGBA Image of the requested size.
-    Must be called from the Qt main thread.
 
     Args:
         active_index: 0-based active account index (-1 = none)
@@ -147,8 +117,7 @@ def render_tray_icon(
         num_accounts: total registered accounts
         size: output pixel size (default 64)
     """
-    svg = generate_icon_svg(active_index, worst_status, num_accounts)
-    return _svg_to_pil(svg, size)
+    return _render_icon_pil(active_index, worst_status, num_accounts, size)
 
 
 def worst_usage_status(accounts_usage: list[dict]) -> str:
