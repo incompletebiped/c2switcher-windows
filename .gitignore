@@ -24,6 +24,9 @@ Desktop.ini
 # Local notes
 notes.md
 
+# Local Claude Code settings (may contain tokens/secrets)
+.claude/settings.local.json
+
 # Dependencies / embedded Python
 Lib/
 share/
