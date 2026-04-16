@@ -2,7 +2,19 @@
 
 > Manage multiple Claude Code accounts with usage tracking, load balancing, and a system tray app
 
-This is a Windows adaptation of [c2switcher-mint](https://github.com/incompletebiped/c2switcher-mint). The CLI tools work identically; the Cinnamon panel applet has been replaced with a native Windows system tray application built on PySide6 + pystray.
+**This project is derived from [can1357/c2switcher](https://github.com/can1357/c2switcher)**, the original multi-account Claude Code manager created by [@can1357](https://github.com/can1357). The core concept, load-balancing algorithm, and CLI design all originate there. All credit for the original idea and implementation belongs to them.
+
+The lineage is:
+
+```
+can1357/c2switcher  (original — KDE Plasma widget + CLI)
+       ↓
+incompletebiped/c2switcher-mint  (Linux port — Cinnamon panel applet)
+       ↓
+incompletebiped/c2switcher-windows  (this repo — Windows system tray app)
+```
+
+This Windows edition is a substantial adaptation rather than a direct code fork — the system tray UI was rewritten from scratch in PySide6, and Windows-specific changes were made throughout — but the foundational ideas, API approach, and load-balancing logic are entirely derived from the original work. The original is released under the MIT License.
 
 ## Features
 
