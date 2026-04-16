@@ -72,6 +72,15 @@ class Store:
         self.conn.execute('PRAGMA journal_mode=WAL')
         self.conn.execute('PRAGMA busy_timeout=5000')
 
+        import os as _os
+        for suffix in ('-wal', '-shm'):
+            p = Path(str(self.db_path) + suffix)
+            if p.exists():
+                try:
+                    _os.chmod(p, 0o600)
+                except OSError:
+                    pass
+
         self._create_schema()
 
     def _create_schema(self):

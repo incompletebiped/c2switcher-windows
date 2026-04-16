@@ -59,7 +59,8 @@ def login(
         # Write credentials
         output_path.parent.mkdir(mode=0o700, parents=True, exist_ok=True)
 
-        temp_path = output_path.with_suffix('.tmp')
+        import secrets as _secrets
+        temp_path = output_path.with_suffix(f'.{_secrets.token_hex(8)}.tmp')
         try:
             with temp_path.open('w', encoding='utf-8') as f:
                 json.dump(credentials, f, indent=2)

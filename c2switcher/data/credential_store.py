@@ -87,47 +87,60 @@ class CredentialStore:
 
         console.print('[yellow]Refreshing token...[/yellow]')
 
-        try:
-            response = requests.post(
-                self.OAUTH_ENDPOINT,
-                json={
-                    'grant_type': 'refresh_token',
-                    'refresh_token': refresh_token,
-                    'client_id': self.CLIENT_ID,
-                },
-                timeout=10,
-            )
+        max_attempts = 3
+        for attempt in range(max_attempts):
+            try:
+                response = requests.post(
+                    self.OAUTH_ENDPOINT,
+                    json={
+                        'grant_type': 'refresh_token',
+                        'refresh_token': refresh_token,
+                        'client_id': self.CLIENT_ID,
+                    },
+                    timeout=10,
+                )
+            except requests.RequestException:
+                if attempt < max_attempts - 1:
+                    time.sleep(2 ** attempt)
+                    continue
+                raise TokenUnavailable('Token refresh failed: network error (check your connection)')
 
-            if response.status_code != 200:
-                error_msg = f'OAuth endpoint returned {response.status_code}'
-                try:
-                    error_data = response.json()
-                    error_type = error_data.get('error', '')
-                    error_desc = error_data.get('error_description', '')
-                    if error_type == 'invalid_grant':
-                        raise InvalidGrant(
-                            f'Refresh token expired/revoked: {error_desc}. Re-authenticate with: c2switcher login'
-                        )
-                    elif error_type or error_desc:
-                        error_msg = f'OAuth error ({response.status_code}): {error_type} - {error_desc}'
-                except (ValueError, KeyError):
-                    pass
-                raise TokenUnavailable(error_msg)
+            if response.status_code == 429:
+                retry_after = int(response.headers.get('Retry-After', 2 ** attempt))
+                if attempt < max_attempts - 1:
+                    time.sleep(min(retry_after, 30))
+                    continue
+                raise TokenUnavailable('Token refresh failed: rate limited by server')
 
-            token_data = response.json()
+            break
 
-            new_creds = copy.deepcopy(creds)
-            new_creds['claudeAiOauth']['accessToken'] = token_data['access_token']
-            new_creds['claudeAiOauth']['refreshToken'] = token_data.get('refresh_token', refresh_token)
-            new_creds['claudeAiOauth']['expiresAt'] = int(time.time() * 1000) + (
-                token_data.get('expires_in', 3600) * 1000
-            )
+        if response.status_code != 200:
+            error_msg = f'Token refresh failed (HTTP {response.status_code})'
+            try:
+                error_data = response.json()
+                error_type = error_data.get('error', '')
+                error_desc = error_data.get('error_description', '')
+                if error_type == 'invalid_grant':
+                    raise InvalidGrant(
+                        f'Refresh token expired or revoked. Re-authenticate with: c2switcher login'
+                    )
+                elif error_type:
+                    error_msg = f'Token refresh failed: {error_type}'
+            except (ValueError, KeyError):
+                pass
+            raise TokenUnavailable(error_msg)
 
-            console.print('[green]Token refreshed successfully[/green]')
-            return new_creds
+        token_data = response.json()
 
-        except requests.RequestException as exc:
-            raise TokenUnavailable(f'OAuth request failed: {exc}')
+        new_creds = copy.deepcopy(creds)
+        new_creds['claudeAiOauth']['accessToken'] = token_data['access_token']
+        new_creds['claudeAiOauth']['refreshToken'] = token_data.get('refresh_token', refresh_token)
+        new_creds['claudeAiOauth']['expiresAt'] = int(time.time() * 1000) + (
+            token_data.get('expires_in', 3600) * 1000
+        )
+
+        console.print('[green]Token refreshed successfully[/green]')
+        return new_creds
 
     def write_credentials(self, credentials: Dict):
         """Write credentials to ~/.claude/.credentials.json."""
@@ -140,7 +153,8 @@ class CredentialStore:
         except OSError:
             pass
 
-        temp_path = self.credentials_path.with_suffix('.tmp')
+        import secrets as _secrets
+        temp_path = self.credentials_path.with_suffix(f'.{_secrets.token_hex(8)}.tmp')
         try:
             with temp_path.open('w', encoding='utf-8') as f:
                 json.dump(credentials, f, indent=2)

@@ -45,23 +45,19 @@ class PKCEGenerator:
 
 
 class OAuthCallbackHandler(BaseHTTPRequestHandler):
-    """HTTP handler for OAuth callback."""
+    """HTTP handler for OAuth callback.
 
-    authorization_code: Optional[str] = None
-    state: Optional[str] = None
-    error: Optional[str] = None
-    success_redirect_url: Optional[str] = None
-    expected_state: Optional[str] = None
+    State is stored on self.server (set by start_callback_server) so that
+    concurrent OAuth flows running in separate HTTPServer instances never
+    clobber each other.
+    """
 
     def log_message(self, format, *args):
-        """Suppress default logging."""
         pass
 
     def do_GET(self):
-        """Handle OAuth callback."""
         parsed = urlparse(self.path)
 
-        # Only accept /callback path
         if parsed.path != '/callback':
             self.send_response(404)
             self.end_headers()
@@ -70,7 +66,7 @@ class OAuthCallbackHandler(BaseHTTPRequestHandler):
         params = parse_qs(parsed.query)
 
         if params.get('error'):
-            OAuthCallbackHandler.error = params['error'][0]
+            self.server._oauth_error = params['error'][0]
             self.send_response(400)
             self.send_header('Content-Type', 'text/html')
             self.end_headers()
@@ -87,8 +83,7 @@ class OAuthCallbackHandler(BaseHTTPRequestHandler):
         code = params.get('code', [None])[0]
         state = params.get('state', [None])[0]
 
-        # Validate state parameter
-        if state != self.expected_state:
+        if state != getattr(self.server, '_oauth_expected_state', None):
             self.send_response(400)
             self.send_header('Content-Type', 'text/html')
             self.end_headers()
@@ -102,17 +97,14 @@ class OAuthCallbackHandler(BaseHTTPRequestHandler):
             )
             return
 
-        OAuthCallbackHandler.authorization_code = code
-        OAuthCallbackHandler.state = state
+        self.server._oauth_code = code
 
-        # Store but don't send response yet (will redirect after token exchange)
-        # This matches Claude Code's behavior of redirecting to success page
-        if self.success_redirect_url:
+        redirect = getattr(self.server, '_oauth_success_redirect', None)
+        if redirect:
             self.send_response(302)
-            self.send_header('Location', self.success_redirect_url)
+            self.send_header('Location', redirect)
             self.end_headers()
         else:
-            # Fallback: show success page
             self.send_response(200)
             self.send_header('Content-Type', 'text/html')
             self.end_headers()
@@ -183,19 +175,19 @@ class OAuthClient:
         return response.json()
 
     def start_callback_server(self, state: str, port: int = 0) -> Tuple[HTTPServer, int]:
-        """Start HTTP server for OAuth callback on random port."""
-        # Set expected state for validation
-        OAuthCallbackHandler.expected_state = state
-
+        """Start HTTP server for OAuth callback on a random port."""
         server = HTTPServer(('localhost', port), OAuthCallbackHandler)
-        actual_port = server.server_address[1]
-        return server, actual_port
+        # Store per-flow state on the server instance, not on the handler class.
+        server._oauth_expected_state = state
+        server._oauth_code = None
+        server._oauth_error = None
+        server._oauth_success_redirect = None
+        return server, server.server_address[1]
 
-    def set_success_redirect(self, scopes: list):
-        """Set success redirect URL based on scopes."""
-        # Inference-only goes to claude.ai, full OAuth goes to console
+    def set_success_redirect(self, server: HTTPServer, scopes: list):
+        """Set success redirect URL on the server instance."""
         is_inference_only = scopes == ['user:inference']
-        OAuthCallbackHandler.success_redirect_url = (
+        server._oauth_success_redirect = (
             'https://claude.ai/oauth/code/success?app=claude-code'
             if is_inference_only
             else 'https://platform.claude.com/oauth/code/success?app=claude-code'
@@ -263,8 +255,8 @@ class OAuthClient:
         def wait_for_server():
             nonlocal code, used_automatic
             server_thread.join(timeout=120)
-            if OAuthCallbackHandler.authorization_code:
-                code = OAuthCallbackHandler.authorization_code
+            if server._oauth_code:
+                code = server._oauth_code
                 used_automatic = True
                 got_code.set()
 
@@ -311,10 +303,9 @@ class OAuthClient:
         try:
             token_data = self.exchange_code(code, code_verifier, redirect_uri, state)
 
-            # Set success redirect if automatic was used
             if used_automatic:
                 scopes = token_data.get('scope', ' '.join(self.config.SCOPES)).split()
-                self.set_success_redirect(scopes)
+                self.set_success_redirect(server, scopes)
 
             # Build credentials
             import time as time_module

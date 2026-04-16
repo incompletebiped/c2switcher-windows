@@ -121,7 +121,8 @@ def atomic_write_json(path: Path, data: Dict[str, Any], preserve_permissions: bo
         except OSError:
             pass
 
-    tmp_path = path.with_suffix(path.suffix + '.tmp')
+    import secrets as _secrets
+    tmp_path = path.with_suffix(f'.{_secrets.token_hex(8)}.tmp')
     try:
         with open(tmp_path, 'w', encoding='utf-8') as handle:
             json.dump(data, handle)
