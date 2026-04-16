@@ -209,28 +209,27 @@ class TrayPopup(QWidget):
         if old:
             old.deleteLater()
 
-        # Compute height from known fixed component sizes rather than sizeHint()
-        # (sizeHint is unreliable before the widget is painted inside a QScrollArea)
-        n = len(accounts)
-        content_h = (
-            36        # UsageBar "Sonnet 7d" (label + bar + margins)
-            + 6       # spacing
-            + 36      # UsageBar "Overall 7d"
-            + 6       # spacing
-            + 22      # LegendRow
-            + 6       # spacing
-            + 1       # separator
-            + 6       # spacing
-            + n * 56  # account cards (approx 56px each)
-            + (n - 1) * 6  # spacing between cards
-            + 14      # vl top+bottom margins
-        )
+        # Defer height fitting until Qt has processed the layout pass.
+        # sizeHint() is unreliable before the widget is laid out inside the
+        # QScrollArea, so we queue the resize on the next event-loop tick.
+        QTimer.singleShot(0, self._fit_height)
+
+    def _fit_height(self):
+        """Resize the popup to fit its content after layout has been computed."""
+        if not self._content:
+            return
+        # Force the layout engine to compute sizes now
+        self._content.adjustSize()
+        content_h = self._content.sizeHint().height()
+        if content_h <= 0:
+            # Fallback: use the widget's actual height if sizeHint is still zero
+            content_h = self._content.height()
+
         screen_h = QApplication.primaryScreen().availableGeometry().height()
         max_h = int(screen_h * 0.80)
-        # 40 header + 1 separator + content
+        # 40px header + 1px separator + content area
         total_h = min(41 + content_h, max_h)
         self.setFixedHeight(max(total_h, 200))
-        # Re-anchor to tray corner if popup is currently visible
         if self.isVisible():
             self._position_near_tray()
 

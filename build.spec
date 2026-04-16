@@ -1,10 +1,15 @@
 # build.spec — Single PyInstaller spec → one c2switcher.exe
 #
-# Build with:
+# Use build.ps1 (preferred) — it sets the correct distpath and creates the
+# Start Menu shortcut automatically:
+#   .\build.ps1              # build + install + shortcut
+#   .\build.ps1 -AddToPath   # also add to user PATH
+#
+# Or build manually (exe lands in dist\ which is gitignored):
 #   pip install pyinstaller
 #   pyinstaller build.spec
 #
-# The resulting dist/c2switcher.exe is both the tray app (no args) and the
+# The resulting c2switcher.exe is both the tray app (no args) and the
 # CLI tool (c2switcher.exe login / ls / usage / switch / etc.)
 
 import sys
