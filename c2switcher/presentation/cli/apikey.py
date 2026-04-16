@@ -74,7 +74,8 @@ def apikey():
 @apikey.command(name='add')
 @click.argument('key', required=False)
 @click.option('--stdin', is_flag=True, help='Read API key from stdin')
-def add_apikey(key: Optional[str], stdin: bool):
+@click.option('--force', is_flag=True, help='Skip format validation')
+def add_apikey(key: Optional[str], stdin: bool, force: bool):
     """Add a long-lived API key (auto-assigns to matching account).
 
     Probes the key to determine which account it belongs to based on
@@ -100,10 +101,9 @@ def add_apikey(key: Optional[str], stdin: bool):
             console.print('[red]Error: API key cannot be empty[/red]')
             return
 
-        if not api_key.startswith('sk-ant-'):
-            console.print("[yellow]Warning: API key does not start with 'sk-ant-'[/yellow]")
-            if not click.confirm('Continue anyway?'):
-                return
+        if not api_key.startswith('sk-ant-') and not force:
+            console.print("[red]Error: API key must start with 'sk-ant-' (use --force to override)[/red]")
+            return
 
         console.print('[dim]Probing API key...[/dim]')
         org_uuid, error = probe_api_key(api_key)

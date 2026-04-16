@@ -142,6 +142,12 @@ def optimal(
         if token_only:
             if not quiet:
                 console.print(Panel(info_text, border_style='green'))
+            import sys as _sys
+            if _sys.stdout.isatty():
+                print(
+                    'WARNING: token printed to terminal — use in a pipe/script to avoid exposure',
+                    file=_sys.stderr,
+                )
             if with_label:
                 print(decision.account.display_identifier())
             print(token)
@@ -231,6 +237,12 @@ def switch(
 
             if token_only:
                 console.print(Panel(panel_content, border_style='green'))
+                import sys as _sys
+                if _sys.stdout.isatty():
+                    print(
+                        'WARNING: token printed to terminal — use in a pipe/script to avoid exposure',
+                        file=_sys.stderr,
+                    )
                 if with_label:
                     print(account.display_identifier())
                 print(token)

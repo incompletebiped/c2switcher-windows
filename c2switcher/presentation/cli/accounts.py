@@ -320,18 +320,31 @@ def remove_account_cmd(identifier: str, yes: bool, output_json: bool):
 
         removed = account_service.remove_account(identifier)
 
-        # Clear ~/.claude/.credentials.json if it belongs to the removed account
+        # Clear ~/.claude/.credentials.json if it belongs to the removed account.
+        # Compare by refresh token (stable) or API key rather than access token
+        # (which rotates hourly and may already differ).
         if CREDENTIALS_PATH.exists():
             try:
                 with open(CREDENTIALS_PATH, 'r', encoding='utf-8') as f:
                     current_creds = json.load(f)
-                current_token = current_creds.get('claudeAiOauth', {}).get('accessToken')
+                current_oauth = current_creds.get('claudeAiOauth', {})
+                current_access = current_oauth.get('accessToken', '')
+                current_refresh = current_oauth.get('refreshToken', '')
+
                 stored_creds = json.loads(removed.credentials_json)
-                stored_token = stored_creds.get('claudeAiOauth', {}).get('accessToken')
-                if current_token and current_token == stored_token:
+                stored_oauth = stored_creds.get('claudeAiOauth', {})
+                stored_refresh = stored_oauth.get('refreshToken', '')
+
+                # Match by refresh token (OAuth) or by API key (api_key accounts
+                # write the key itself as accessToken with no refreshToken)
+                matched = (
+                    (stored_refresh and current_refresh == stored_refresh)
+                    or (removed.api_key and current_access == removed.api_key)
+                )
+                if matched:
                     CREDENTIALS_PATH.unlink()
-            except Exception:
-                pass
+            except Exception as exc:
+                console.print(f'[yellow]Warning: could not clean up credentials file: {exc}[/yellow]')
 
         if output_json:
             print(json.dumps({

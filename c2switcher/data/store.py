@@ -10,6 +10,16 @@ from typing import Dict, List, Optional, Tuple
 
 from ..constants import C2SWITCHER_DIR, DB_PATH, DEFAULT_BURST_BUFFER
 from ..core.models import Account, Session, UsageSnapshot
+from ..infrastructure.crypto import encrypt as _encrypt, decrypt as _decrypt
+
+
+def _account_from_row(row: sqlite3.Row) -> Account:
+    """Load Account from DB row, decrypting sensitive fields."""
+    acc = Account.from_row(row)
+    acc.credentials_json = _decrypt(acc.credentials_json)
+    if acc.api_key:
+        acc.api_key = _decrypt(acc.api_key)
+    return acc
 
 
 class Store:
@@ -201,7 +211,7 @@ class Store:
         """Load all accounts into memory."""
         cursor = self.conn.cursor()
         cursor.execute('SELECT * FROM accounts ORDER BY index_num')
-        self._accounts_cache = [Account.from_row(row) for row in cursor.fetchall()]
+        self._accounts_cache = [_account_from_row(row) for row in cursor.fetchall()]
         self._accounts_by_uuid = {acc.uuid: acc for acc in self._accounts_cache}
 
     def _load_usage_cache(self, max_age_seconds: int = 300):
@@ -375,7 +385,7 @@ class Store:
             cursor.execute('SELECT id, index_num FROM accounts WHERE uuid = ?', (uuid,))
             existing = cursor.fetchone()
 
-            credentials_json = json.dumps(credentials)
+            credentials_json = _encrypt(json.dumps(credentials))
 
             if existing:
                 cursor.execute(
@@ -489,7 +499,7 @@ class Store:
             cursor = self.conn.cursor()
             cursor.execute(
                 'UPDATE accounts SET credentials_json = ?, updated_at = CURRENT_TIMESTAMP WHERE uuid = ?',
-                (json.dumps(credentials), account_uuid),
+                (_encrypt(json.dumps(credentials)), account_uuid),
             )
 
         # Invalidate accounts cache
@@ -511,7 +521,7 @@ class Store:
             cursor = self.conn.cursor()
             cursor.execute(
                 'UPDATE accounts SET api_key = ?, updated_at = CURRENT_TIMESTAMP WHERE uuid = ?',
-                (api_key, account_uuid),
+                (_encrypt(api_key) if api_key else None, account_uuid),
             )
 
         # Invalidate accounts cache

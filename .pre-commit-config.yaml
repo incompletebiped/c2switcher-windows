@@ -1,0 +1,15 @@
+repos:
+  - repo: local
+    hooks:
+      - id: detect-secrets
+        name: detect-secrets
+        language: system
+        entry: Scripts/detect-secrets-hook.exe
+        args: ['--baseline', '.secrets.baseline']
+        exclude: >
+          (?x)^(
+            Lib/.*|
+            dist/.*|
+            \.git/.*|
+            .*\.pyc
+          )$
