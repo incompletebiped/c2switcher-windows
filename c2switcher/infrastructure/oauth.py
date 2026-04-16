@@ -272,22 +272,28 @@ class OAuthClient:
         watcher.start()
 
         print('Waiting for authorization (paste code or complete in browser)...')
+
+        # Read stdin in a daemon thread — select.select doesn't work with
+        # file handles on Windows, so we can't poll stdin on the main thread.
+        def _read_stdin():
+            nonlocal code
+            try:
+                import sys as _sys
+                line = _sys.stdin.readline().strip()
+                if line:
+                    if '#' in line:
+                        line = line.split('#')[0]
+                    code = line
+                    got_code.set()
+            except Exception:
+                pass
+
+        stdin_thread = threading.Thread(target=_read_stdin, daemon=True)
+        stdin_thread.start()
+
         try:
-            while not got_code.is_set():
-                # Check every 0.5s if server got it; if not, try non-blocking read
-                if got_code.wait(timeout=0.5):
-                    break
-                # Try reading a line from stdin (blocks until user hits enter)
-                import sys
-                import select
-                if select.select([sys.stdin], [], [], 0)[0]:
-                    manual_code = sys.stdin.readline().strip()
-                    if manual_code:
-                        if '#' in manual_code:
-                            manual_code = manual_code.split('#')[0]
-                        code = manual_code
-                        break
-        except (EOFError, KeyboardInterrupt):
+            got_code.wait(timeout=120)
+        except KeyboardInterrupt:
             pass
 
         if used_automatic:

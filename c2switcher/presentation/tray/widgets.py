@@ -646,7 +646,14 @@ class AccountCard(QWidget):
     def _do_reauth(self):
         import subprocess, sys
         try:
-            subprocess.Popen([sys.executable, '-m', 'c2switcher', 'login'])
+            kwargs = {}
+            if sys.platform == 'win32':
+                kwargs['creationflags'] = subprocess.CREATE_NEW_CONSOLE
+            if getattr(sys, 'frozen', False):
+                cmd = [sys.executable, 'login']
+            else:
+                cmd = [sys.executable, '-m', 'c2switcher', 'login']
+            subprocess.Popen(cmd, **kwargs)
         except Exception:
             pass
 

@@ -50,22 +50,30 @@ def _get_claude_pids() -> list[int]:
     return pids
 
 
-def is_claude_processing(claude_pids: list[int]) -> bool:
-    """True if any Claude PID has an ESTABLISHED external TCP connection.
+def is_claude_processing(
+    claude_pids: list[int],
+    prev_connections: frozenset,
+) -> tuple[bool, frozenset]:
+    """True if Claude's TCP connection set changed since last poll.
 
-    Mirrors `_isClaudeProcessing()` in applet.js — any established non-localhost
-    connection means a request is in flight (sending, thinking, or streaming).
+    HTTP/2 keeps connections ESTABLISHED even while idle, so checking for
+    *any* established connection produces a permanent lock.  Instead we
+    trigger only when the connection set changes (new connection, dropped
+    connection, or a transitional state like SYN_SENT / CLOSE_WAIT).
 
-    Requires psutil; falls back to False if access is denied (common on Windows
-    without admin privileges).
+    Returns (is_active, current_connection_set).
     """
     if not claude_pids:
-        return False
+        return False, frozenset()
+
     pid_set = set(claude_pids)
+    _TRANSITIONAL = {'SYN_SENT', 'SYN_RECV', 'CLOSE_WAIT',
+                     'FIN_WAIT1', 'FIN_WAIT2', 'TIME_WAIT', 'LAST_ACK', 'CLOSING'}
+    established: set[tuple] = set()
+    has_transitional = False
+
     try:
         for conn in psutil.net_connections(kind='tcp'):
-            if conn.status != 'ESTABLISHED':
-                continue
             if conn.pid not in pid_set:
                 continue
             raddr = conn.raddr
@@ -74,12 +82,19 @@ def is_claude_processing(claude_pids: list[int]) -> bool:
             ip = raddr.ip
             if ip.startswith('127.') or ip == '::1':
                 continue
-            return True
+            if conn.status in _TRANSITIONAL:
+                has_transitional = True
+            elif conn.status == 'ESTABLISHED':
+                established.add((conn.pid, ip, raddr.port))
     except (psutil.AccessDenied, PermissionError):
-        pass
+        return False, prev_connections
     except Exception:
-        pass
-    return False
+        return False, prev_connections
+
+    current = frozenset(established)
+    changed = current != prev_connections
+    is_active = has_transitional or changed
+    return is_active, current
 
 
 def _read_refresh_token(cred_path: Path) -> Optional[str]:
@@ -247,6 +262,8 @@ class TrayMonitor:
         self._cred_changed_at: float = 0  # debounce timestamp
         self._pending_cred_check: bool = False
 
+        self._prev_connections: frozenset = frozenset()
+
         # Latest data snapshot (read from tray app, written from monitor thread)
         self._lock = threading.Lock()
         self._accounts: list[dict] = []
@@ -303,7 +320,7 @@ class TrayMonitor:
 
             # ── Session / processing detection ────────────────────────────────
             pids = _get_claude_pids()
-            active_now = is_claude_processing(pids)
+            active_now, self._prev_connections = is_claude_processing(pids, self._prev_connections)
             if active_now:
                 self._last_processing_detected_at = now
 

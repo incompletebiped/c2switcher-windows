@@ -140,8 +140,8 @@ class TrayApp:
                     active_idx = i
                     break
 
-            usage_list = [a.get('usage') or {} for a in self._accounts]
-            status = worst_usage_status(usage_list)
+            active_acc = next((a for a in self._accounts if a.get('is_active')), None)
+            status = worst_usage_status([active_acc.get('usage') or {}] if active_acc else [])
             img = render_tray_icon(active_idx, status, len(self._accounts))
 
             self._icon.icon = img
