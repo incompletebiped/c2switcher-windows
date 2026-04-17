@@ -176,13 +176,19 @@ The label `[index] nickname` is purple. Each percentage is color-coded green/yel
 
 **Setup:**
 
-Add to `%USERPROFILE%\.claude\settings.json`:
+If you're using this repo with Claude Code, run the included slash command — it auto-detects your username and writes the correct config:
+
+```
+/setup-statusline
+```
+
+Or add manually to `%USERPROFILE%\.claude\settings.json`:
 
 ```json
 {
   "statusLine": {
     "type": "command",
-    "command": "powershell -NoProfile -NonInteractive -Command \"$f='C:\\Users\\YOUR_USERNAME\\AppData\\Roaming\\c2switcher\\current_account.txt';if(Test-Path $f){(gc $f -Raw).Trim()}\""
+    "command": "cat /c/Users/YOUR_USERNAME/AppData/Roaming/c2switcher/current_account.txt"
   }
 }
 ```
@@ -206,6 +212,23 @@ Always use `build.ps1` — it installs to the correct location and creates the S
 ```
 
 Do **not** run `pyinstaller build.spec` directly (that outputs to `dist/` and won't update the installed exe). After rebuilding, restart the tray app for changes to take effect.
+
+---
+
+## Claude Code Slash Commands
+
+If you're working on this repo inside Claude Code, the following slash commands are available:
+
+| Command | Description |
+|---|---|
+| `/setup-statusline` | Auto-configure the Claude Code statusline for c2switcher |
+| `/rebuild` | Run `build.ps1`, report result, and remind you to restart the tray |
+| `/diagnose` | Full health check — tray process, cache file, accounts, token validity |
+| `/add-account` | Guided OAuth login flow with nickname prompt and verification |
+| `/debug-auth` | Deep token inspection — expiry times, stale flags, cross-reference active credentials |
+| `/check-sessions` | Active and recent sessions, stale PID detection, per-account counts |
+
+These are defined in `.claude/commands/` and require no setup — just open the repo in Claude Code and invoke them.
 
 ---
 

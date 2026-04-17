@@ -177,6 +177,13 @@ def _fetch_usage_data() -> list[dict]:
                         refreshed = cred_store.refresh_access_token(acc.credentials_json)
                         token = refreshed.get('claudeAiOauth', {}).get('accessToken')
                         if token:
+                            # Persist rotated credentials so the new refresh token
+                            # isn't lost (token rotation invalidates the old one)
+                            try:
+                                if refreshed != json.loads(acc.credentials_json):
+                                    store.update_credentials(acc.uuid, refreshed)
+                            except Exception:
+                                pass
                             usage_info = ClaudeAPI.get_usage(token)
                             store.save_usage(acc.uuid, usage_info)
                 except Exception:
