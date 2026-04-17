@@ -7,7 +7,7 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime, timezone
 from typing import Dict, List, Optional, Set, Tuple
 
-from ..constants import CACHE_TTL_SECONDS, console
+from ..constants import CACHE_TTL_SECONDS, console, CREDENTIALS_PATH
 from ..core.errors import InvalidGrant, NoAccountsAvailable, UsageFetchError
 from ..core.load_balancing import (
     build_candidate,
@@ -164,6 +164,41 @@ class SwitchingService:
 
         return SelectionDecision.from_candidate(selected, reused=False)
 
+    def _try_recover_credentials_from_file(self, account: Account) -> bool:
+        """Check .credentials.json for fresher credentials for this account.
+
+        Called when InvalidGrant is raised — the stored refresh token may be stale
+        if Claude Code independently rotated it. Returns True if credentials were
+        updated in the DB (caller should retry the failed operation).
+        """
+        try:
+            if not CREDENTIALS_PATH.exists():
+                return False
+            raw = CREDENTIALS_PATH.read_text(encoding='utf-8')
+            file_creds = json.loads(raw)
+            file_refresh = file_creds.get('claudeAiOauth', {}).get('refreshToken')
+
+            acc_creds = account.get_credentials()
+            acc_refresh = acc_creds.get('claudeAiOauth', {}).get('refreshToken')
+
+            if not file_refresh or file_refresh == acc_refresh:
+                return False
+
+            refreshed = self.credential_store.refresh_access_token(raw)
+            token = refreshed.get('claudeAiOauth', {}).get('accessToken')
+            if not token:
+                return False
+
+            profile = ClaudeAPI.get_profile(token)
+            if profile.get('account', {}).get('uuid') != account.uuid:
+                return False
+
+            self.store.update_credentials(account.uuid, refreshed)
+            account.credentials_json = json.dumps(refreshed)
+            return True
+        except Exception:
+            return False
+
     def switch_to(self, identifier: str, token_only: bool = False) -> Account:
         """
         Switch to specific account by identifier.
@@ -182,8 +217,15 @@ class SwitchingService:
         try:
             refreshed_creds = self.credential_store.refresh_access_token(account.credentials_json)
         except InvalidGrant:
-            self.store.set_needs_reauth(account.uuid, True)
-            raise
+            if self._try_recover_credentials_from_file(account):
+                try:
+                    refreshed_creds = self.credential_store.refresh_access_token(account.credentials_json)
+                except InvalidGrant:
+                    self.store.set_needs_reauth(account.uuid, True)
+                    raise
+            else:
+                self.store.set_needs_reauth(account.uuid, True)
+                raise
 
         if not token_only:
             self.credential_store.write_credentials_for_account(account, refreshed_creds)
@@ -326,11 +368,12 @@ class SwitchingService:
                     usage_data, refreshed_creds = future.result()
                     fetch_results.append((account, usage_data, refreshed_creds))
                 except InvalidGrant:
-                    console.print(
-                        f'[red]Re-authentication required for {account.email}[/red]'
-                    )
-                    # DB write deferred to sequential section below
-                    self.store.set_needs_reauth(account.uuid, True)
+                    # Try to recover from .credentials.json before giving up
+                    if not self._try_recover_credentials_from_file(account):
+                        console.print(
+                            f'[red]Re-authentication required for {account.email}[/red]'
+                        )
+                        self.store.set_needs_reauth(account.uuid, True)
                 except Exception as exc:
                     console.print(
                         f'[yellow]Warning: Could not fetch usage for {account.email} ({label}): {exc}[/yellow]'

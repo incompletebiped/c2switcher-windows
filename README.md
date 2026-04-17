@@ -159,6 +159,54 @@ The tray app monitors `~\.claude\.credentials.json` for changes. When a new logi
 
 The tray app can register itself in the Windows startup registry (`HKCU\Software\Microsoft\Windows\CurrentVersion\Run`) to launch automatically at login.
 
+### Optional: Claude Code Status Line
+
+Show the active account, nickname, and live usage in the Claude Code status bar.
+
+**What it looks like:**
+```
+[1] BxB Media  5h:20%  7d:3%
+```
+
+The label `[index] nickname` is purple. Each percentage is color-coded green/yellow/red matching the tray thresholds (< 70% / 70–90% / > 90%).
+
+**Why this approach:** `c2switcher.exe` takes ~3–4 seconds to start (PyInstaller + SQLite + DPAPI) — far too slow for a status line. Instead, the tray app writes `%APPDATA%\c2switcher\current_account.txt` on every refresh (every 60s and on each switch), and the status line reads that file directly via PowerShell (~800ms).
+
+**Prerequisite:** The tray app must be running. It writes the cache file; the status line just reads it. The file is created on the tray's first refresh after launch.
+
+**Setup:**
+
+Add to `%USERPROFILE%\.claude\settings.json`:
+
+```json
+{
+  "statusLine": {
+    "type": "command",
+    "command": "powershell -NoProfile -NonInteractive -Command \"$f='C:\\Users\\YOUR_USERNAME\\AppData\\Roaming\\c2switcher\\current_account.txt';if(Test-Path $f){(gc $f -Raw).Trim()}\""
+  }
+}
+```
+
+Replace `YOUR_USERNAME` with your Windows username. Restart Claude Code for the setting to take effect.
+
+**Troubleshooting:**
+
+| Symptom | Fix |
+|---|---|
+| Nothing shows | Confirm the tray app is running and `%APPDATA%\c2switcher\current_account.txt` exists |
+| Plain text `[1] nickname` with no usage or color | Tray app is running an old build — rebuild with `.\build.ps1` and restart |
+| Escape codes show as literal text (`[38;5;141m...`) | Claude Code version doesn't support ANSI in the statusline — upgrade Claude Code |
+
+**Rebuilding after source changes:**
+
+Always use `build.ps1` — it installs to the correct location and creates the Start Menu shortcut:
+
+```powershell
+.\build.ps1
+```
+
+Do **not** run `pyinstaller build.spec` directly (that outputs to `dist/` and won't update the installed exe). After rebuilding, restart the tray app for changes to take effect.
+
 ---
 
 ## CLI Usage
@@ -359,6 +407,7 @@ Each `c2claude` invocation registers a session, selects an account, runs Claude,
 | `%APPDATA%\c2switcher\.lock` | File lock for concurrent operation safety |
 | `%APPDATA%\c2switcher\theme.json` | Theme preference (light/dark) |
 | `%APPDATA%\c2switcher\headers.json` | HTTP header configuration |
+| `%APPDATA%\c2switcher\current_account.txt` | Cache file for status line (written by tray app) |
 | `~\.claude\.credentials.json` | Active Claude Code credentials |
 
 ## Environment Variables

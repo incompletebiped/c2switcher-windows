@@ -432,6 +432,7 @@ class Store:
                         uuid,
                     ),
                 )
+                self._load_accounts_cache()
                 account = self.get_account_by_uuid(uuid)
                 return account, False
 

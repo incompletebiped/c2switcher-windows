@@ -20,6 +20,7 @@ CLAUDE_DIR = Path.home() / '.claude'
 CREDENTIALS_PATH = CLAUDE_DIR / '.credentials.json'
 LB_STATE_PATH = C2SWITCHER_DIR / 'load_balancer_state.json'
 THEME_PREF_PATH = C2SWITCHER_DIR / 'theme.json'
+STATUS_CACHE_PATH = C2SWITCHER_DIR / 'current_account.txt'
 
 # Load balancer tuning parameters
 SIMILAR_DRAIN_THRESHOLD = 0.05  # %/hour margin to consider accounts interchangeable

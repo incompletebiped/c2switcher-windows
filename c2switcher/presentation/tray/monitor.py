@@ -18,7 +18,7 @@ from typing import Callable, Optional
 
 import psutil
 
-from ...constants import CREDENTIALS_PATH, CREDENTIALS_PATH as _CRED_PATH
+from ...constants import CREDENTIALS_PATH, CREDENTIALS_PATH as _CRED_PATH, STATUS_CACHE_PATH
 from ...infrastructure.factory import ServiceFactory
 from ...infrastructure.locking import acquire_lock
 
@@ -199,22 +199,66 @@ def _fetch_usage_data() -> list[dict]:
     return results
 
 
+def _write_status_cache(accounts: list) -> None:
+    """Write active account + usage to STATUS_CACHE_PATH for fast statusline reads."""
+    RESET  = '\033[00m'
+    PURPLE = '\033[38;5;141m'
+    GREEN  = '\033[38;5;82m'
+    YELLOW = '\033[38;5;226m'
+    RED    = '\033[38;5;196m'
+
+    def _usage_color(pct: float) -> str:
+        if pct >= 90:
+            return RED
+        if pct >= 70:
+            return YELLOW
+        return GREEN
+
+    try:
+        line = ''
+        for acc in accounts:
+            if not acc.get('is_active'):
+                continue
+            nickname = acc.get('nickname') or (acc.get('email', '').split('@')[0])
+            line = f"{PURPLE}[{acc['index']}] {nickname}{RESET}"
+
+            usage = acc.get('usage') or {}
+            fh_util = (usage.get('five_hour') or {}).get('utilization')
+            sd_util = (usage.get('seven_day') or {}).get('utilization')
+
+            parts = []
+            if fh_util is not None:
+                parts.append(f"5h:{_usage_color(fh_util)}{round(fh_util)}%{RESET}")
+            if sd_util is not None:
+                parts.append(f"7d:{_usage_color(sd_util)}{round(sd_util)}%{RESET}")
+            if parts:
+                line += ' ' + ' '.join(parts)
+            break
+        STATUS_CACHE_PATH.write_text(line, encoding='utf-8')
+    except Exception:
+        pass
+
+
 def _try_import_credentials() -> bool:
     """Try to import the current credentials file as a new account.
 
-    Returns True if an account was added or updated.
+    Returns True if an account was added or updated. Retries on transient errors
+    (e.g., profile fetch network failure) so stale credentials don't persist.
     """
-    try:
-        cred_path = CREDENTIALS_PATH
-        if not cred_path.exists():
-            return False
-        creds_json = cred_path.read_text(encoding='utf-8')
-        with ServiceFactory() as factory:
-            account_svc = factory.get_account_service()
-            _account, is_new = account_svc.add_account(creds_json)
-            return True
-    except Exception:
-        return False
+    for attempt in range(3):
+        try:
+            cred_path = CREDENTIALS_PATH
+            if not cred_path.exists():
+                return False
+            creds_json = cred_path.read_text(encoding='utf-8')
+            with ServiceFactory() as factory:
+                account_svc = factory.get_account_service()
+                _account, is_new = account_svc.add_account(creds_json)
+                return True
+        except Exception:
+            if attempt < 2:
+                time.sleep(1)
+    return False
 
 
 def _do_auto_switch():
@@ -368,6 +412,7 @@ class TrayMonitor:
             data = []
         with self._lock:
             self._accounts = data
+        _write_status_cache(data)
         self._on_data_updated(data)
 
     def _check_for_new_login(self):
