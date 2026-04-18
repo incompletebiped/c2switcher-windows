@@ -85,6 +85,7 @@ class CredentialStore:
         if not refresh_token:
             raise TokenUnavailable('No refresh token available')
 
+        from ..infrastructure.auth_log import log as _alog, tok as _tok
         console.print('[yellow]Refreshing token...[/yellow]')
 
         max_attempts = 3
@@ -121,6 +122,7 @@ class CredentialStore:
                 error_type = error_data.get('error', '')
                 error_desc = error_data.get('error_description', '')
                 if error_type == 'invalid_grant':
+                    _alog('INVALID_GRANT', context='token_refresh', tok=_tok(refresh_token))
                     raise InvalidGrant(
                         f'Refresh token expired or revoked. Re-authenticate with: c2switcher login'
                     )
@@ -134,16 +136,23 @@ class CredentialStore:
 
         new_creds = copy.deepcopy(creds)
         new_creds['claudeAiOauth']['accessToken'] = token_data['access_token']
-        new_creds['claudeAiOauth']['refreshToken'] = token_data.get('refresh_token', refresh_token)
+        new_refresh = token_data.get('refresh_token', refresh_token)
+        new_creds['claudeAiOauth']['refreshToken'] = new_refresh
         new_creds['claudeAiOauth']['expiresAt'] = int(time.time() * 1000) + (
             token_data.get('expires_in', 3600) * 1000
         )
+
+        if new_refresh != refresh_token:
+            _alog('TOKEN_ROTATED', old=_tok(refresh_token), new=_tok(new_refresh))
 
         console.print('[green]Token refreshed successfully[/green]')
         return new_creds
 
     def write_credentials(self, credentials: Dict):
         """Write credentials to ~/.claude/.credentials.json."""
+        from ..infrastructure.auth_log import log as _alog, tok as _tok
+        _refresh = credentials.get('claudeAiOauth', {}).get('refreshToken')
+        _alog('CRED_FILE_WRITE', tok=_tok(_refresh))
         CLAUDE_DIR.mkdir(mode=0o700, parents=True, exist_ok=True)
 
         try:

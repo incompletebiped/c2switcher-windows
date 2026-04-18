@@ -539,6 +539,10 @@ class Store:
 
     def set_needs_reauth(self, account_uuid: str, value: bool):
         """Mark or clear the needs_reauth flag for an account."""
+        if value:
+            from ..infrastructure.auth_log import log as _alog
+            acc = self._accounts_by_uuid.get(account_uuid)
+            _alog('NEEDS_REAUTH_SET', account=getattr(acc, 'email', account_uuid))
         with self.conn:
             cursor = self.conn.cursor()
             cursor.execute(

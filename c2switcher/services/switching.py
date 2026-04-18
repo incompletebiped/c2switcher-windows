@@ -9,6 +9,7 @@ from typing import Dict, List, Optional, Set, Tuple
 
 from ..constants import CACHE_TTL_SECONDS, console, CREDENTIALS_PATH
 from ..core.errors import InvalidGrant, NoAccountsAvailable, UsageFetchError
+from ..infrastructure import auth_log as _auth_log
 from ..core.load_balancing import (
     build_candidate,
     needs_refresh,
@@ -214,16 +215,21 @@ class SwitchingService:
         if not account:
             raise NoAccountsAvailable(f'Account not found: {identifier}')
 
+        _auth_log.log('SWITCH_TO', account=account.email)
         try:
             refreshed_creds = self.credential_store.refresh_access_token(account.credentials_json)
         except InvalidGrant:
+            _auth_log.log('INVALID_GRANT', account=account.email, context='switch_to')
             if self._try_recover_credentials_from_file(account):
+                _auth_log.log('RECOVERY_OK', account=account.email)
                 try:
                     refreshed_creds = self.credential_store.refresh_access_token(account.credentials_json)
                 except InvalidGrant:
+                    _auth_log.log('INVALID_GRANT', account=account.email, context='switch_to_after_recovery')
                     self.store.set_needs_reauth(account.uuid, True)
                     raise
             else:
+                _auth_log.log('RECOVERY_FAIL', account=account.email)
                 self.store.set_needs_reauth(account.uuid, True)
                 raise
 
@@ -369,11 +375,15 @@ class SwitchingService:
                     fetch_results.append((account, usage_data, refreshed_creds))
                 except InvalidGrant:
                     # Try to recover from .credentials.json before giving up
+                    _auth_log.log('INVALID_GRANT', account=account.email, context='fetch_usage_batch')
                     if not self._try_recover_credentials_from_file(account):
+                        _auth_log.log('RECOVERY_FAIL', account=account.email)
                         console.print(
                             f'[red]Re-authentication required for {account.email}[/red]'
                         )
                         self.store.set_needs_reauth(account.uuid, True)
+                    else:
+                        _auth_log.log('RECOVERY_OK', account=account.email)
                 except Exception as exc:
                     console.print(
                         f'[yellow]Warning: Could not fetch usage for {account.email} ({label}): {exc}[/yellow]'

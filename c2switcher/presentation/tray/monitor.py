@@ -107,15 +107,20 @@ def _read_refresh_token(cred_path: Path) -> Optional[str]:
         return None
 
 
-def _fetch_usage_data() -> list[dict]:
-    """Fetch usage for all accounts via the service layer. Returns list of dicts
-    matching the `c2switcher usage --json` output schema."""
+def _fetch_usage_data() -> tuple[list[dict], Optional[str]]:
+    """Fetch usage for all accounts via the service layer. Returns (accounts, new_active_refresh_token).
+
+    new_active_refresh_token is set when the active account's credentials were rotated
+    so the caller can update .credentials.json and _last_known_refresh_token."""
     from datetime import datetime, timezone
     from ...infrastructure.api import ClaudeAPI
     from ...data.credential_store import CredentialStore
     from ...constants import CREDENTIALS_PATH as CPATH
+    from ...core.errors import InvalidGrant as _InvalidGrant
+    from ...infrastructure import auth_log as _auth_log
 
     results = []
+    new_active_refresh: Optional[str] = None
     with ServiceFactory() as factory:
         try:
             session_svc = factory.get_session_service()
@@ -182,10 +187,26 @@ def _fetch_usage_data() -> list[dict]:
                             try:
                                 if refreshed != json.loads(acc.credentials_json):
                                     store.update_credentials(acc.uuid, refreshed)
+                                    # For the active account, also write .credentials.json.
+                                    # Without this, Claude Code still holds the old (now-invalid)
+                                    # refresh token and will get invalid_grant on its next refresh.
+                                    if acc.uuid == active_uuid and not acc.api_key:
+                                        cred_store.write_credentials(refreshed)
+                                        new_active_refresh = refreshed.get('claudeAiOauth', {}).get('refreshToken')
                             except Exception:
                                 pass
                             usage_info = ClaudeAPI.get_usage(token)
                             store.save_usage(acc.uuid, usage_info)
+                except _InvalidGrant:
+                    # Surface immediately rather than hiding it — the account is
+                    # already broken and the user should see it in the tray now
+                    # rather than being surprised when they try to switch.
+                    _auth_log.log('INVALID_GRANT', account=acc.email, context='background_usage_check')
+                    try:
+                        store.set_needs_reauth(acc.uuid, True)
+                        needs_reauth = True
+                    except Exception:
+                        pass
                 except Exception:
                     pass
 
@@ -203,7 +224,7 @@ def _fetch_usage_data() -> list[dict]:
         except Exception:
             pass
 
-    return results
+    return results, new_active_refresh
 
 
 def _write_status_cache(accounts: list) -> None:
@@ -414,9 +435,14 @@ class TrayMonitor:
 
     def _do_refresh(self):
         try:
-            data = _fetch_usage_data()
+            data, new_active_refresh = _fetch_usage_data()
         except Exception:
-            data = []
+            data, new_active_refresh = [], None
+        # If we rotated the active account's credentials and wrote them to
+        # .credentials.json, update _last_known_refresh_token now so that
+        # _check_for_new_login doesn't misfire and show a "new account" notification.
+        if new_active_refresh:
+            self._last_known_refresh_token = new_active_refresh
         with self._lock:
             self._accounts = data
         _write_status_cache(data)
