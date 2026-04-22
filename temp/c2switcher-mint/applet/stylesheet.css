@@ -1,0 +1,248 @@
+/* ── Header ─────────────────────────────────────────────── */
+
+.c2s-title {
+    font-size: 13px;
+    font-weight: 500;
+    color: rgba(255, 255, 255, 0.6);
+    padding-top: 2px;
+}
+
+.c2s-btn {
+    padding: 4px 6px;
+    border-radius: 4px;
+    margin-left: 4px;
+}
+
+.c2s-reorder-btn {
+    padding: 2px 4px;
+    margin-left: 0;
+}
+
+.c2s-btn:hover {
+    background-color: rgba(255, 255, 255, 0.1);
+}
+
+.c2s-btn-icon {
+    color: rgba(255, 255, 255, 0.7);
+}
+
+/* ── Clickable title ────────────────────────────────── */
+
+.c2s-title-btn {
+    border-radius: 4px;
+    padding: 2px 4px;
+}
+
+.c2s-title-btn:hover {
+    background-color: rgba(255, 255, 255, 0.08);
+}
+
+/* ── Usage bars ─────────────────────────────────────────── */
+
+.c2s-bars-section {
+    min-width: 380px;
+    padding: 4px 0;
+}
+
+.c2s-bar-label {
+    font-size: 11px;
+    font-weight: 500;
+    color: rgba(255, 255, 255, 0.8);
+    padding-bottom: 4px;
+}
+
+.c2s-bar-row {
+    spacing: 8px;
+}
+
+.c2s-bar-bg {
+    background-color: rgba(0, 0, 0, 0.3);
+    border-radius: 4px;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.c2s-bar-pct {
+    font-size: 11px;
+    font-weight: 500;
+    color: rgba(255, 255, 255, 0.85);
+    min-width: 36px;
+    padding-top: 2px;
+}
+
+/* ── Legend ──────────────────────────────────────────────── */
+
+.c2s-legend {
+    padding-top: 2px;
+}
+
+.c2s-legend-text {
+    font-size: 10px;
+    color: rgba(255, 255, 255, 0.7);
+}
+
+/* ── Account cards ──────────────────────────────────────── */
+
+.c2s-card {
+    padding: 2px 0;
+}
+
+.c2s-card-reauth {
+    border-left: 2px solid rgba(230, 154, 123, 0.6);
+    padding-left: 4px;
+}
+
+.c2s-reauth-btn {
+    padding: 3px 6px;
+    border-radius: 4px;
+    background-color: rgba(230, 154, 123, 0.15);
+    border: 1px solid rgba(230, 154, 123, 0.4);
+    color: #E69A7B;
+    margin-top: 2px;
+}
+
+.c2s-reauth-btn:hover {
+    background-color: rgba(230, 154, 123, 0.3);
+}
+
+.c2s-card-index {
+    font-size: 11px;
+    font-weight: bold;
+    color: rgba(255, 255, 255, 0.4);
+    padding-right: 6px;
+}
+
+.c2s-card-name {
+    font-size: 11px;
+    font-weight: bold;
+    color: rgba(255, 255, 255, 0.9);
+}
+
+.c2s-card-email {
+    font-size: 10px;
+    color: rgba(255, 255, 255, 0.4);
+}
+
+/* ── Usage indicators ───────────────────────────────────── */
+
+.c2s-indicators {
+    spacing: 4px;
+}
+
+.c2s-ind {
+    spacing: 2px;
+}
+
+.c2s-ind-label {
+    font-size: 9px;
+    color: rgba(255, 255, 255, 0.5);
+}
+
+.c2s-ind-value {
+    font-size: 10px;
+    font-weight: 500;
+    color: rgba(255, 255, 255, 0.85);
+}
+
+/* ── Status / error states ──────────────────────────────── */
+
+.c2s-status-text {
+    color: rgba(255, 255, 255, 0.5);
+    padding: 20px 0;
+}
+
+.c2s-error-box {
+    padding: 16px 0;
+}
+
+.c2s-error-title {
+    font-size: 13px;
+    color: rgba(255, 255, 255, 0.9);
+    padding-top: 8px;
+}
+
+.c2s-error-hint {
+    font-size: 11px;
+    color: rgba(255, 255, 255, 0.5);
+    padding-top: 4px;
+}
+
+/* ── Retro theme (purple phosphor) overrides ────────── */
+
+.c2s-retro .c2s-title {
+    color: #AFA9EC;
+}
+
+.c2s-retro .c2s-title-btn:hover {
+    background-color: rgba(127, 119, 221, 0.15);
+}
+
+.c2s-retro .c2s-btn-icon {
+    color: #7F77DD;
+}
+
+.c2s-retro .c2s-btn:hover {
+    background-color: rgba(127, 119, 221, 0.18);
+}
+
+.c2s-retro .c2s-bar-label {
+    color: #AFA9EC;
+}
+
+.c2s-retro .c2s-bar-bg {
+    background-color: rgba(28, 24, 66, 0.45);
+    border: 1px solid rgba(127, 119, 221, 0.2);
+}
+
+.c2s-retro .c2s-bar-pct {
+    color: #EEEDFE;
+}
+
+.c2s-retro .c2s-legend-text {
+    color: #AFA9EC;
+}
+
+.c2s-retro .c2s-card-index {
+    color: rgba(127, 119, 221, 0.5);
+}
+
+.c2s-retro .c2s-card-name {
+    color: #EEEDFE;
+}
+
+.c2s-retro .c2s-card-email {
+    color: rgba(127, 119, 221, 0.6);
+}
+
+.c2s-retro .c2s-ind-label {
+    color: rgba(175, 169, 236, 0.6);
+}
+
+.c2s-retro .c2s-card-reauth {
+    border-left: 2px solid rgba(226, 75, 74, 0.6);
+}
+
+.c2s-retro .c2s-reauth-btn {
+    background-color: rgba(226, 75, 74, 0.15);
+    border: 1px solid rgba(226, 75, 74, 0.4);
+    color: #E24B4A;
+}
+
+.c2s-retro .c2s-reauth-btn:hover {
+    background-color: rgba(226, 75, 74, 0.3);
+}
+
+.c2s-retro .c2s-ind-value {
+    color: #EEEDFE;
+}
+
+.c2s-retro .c2s-status-text {
+    color: rgba(175, 169, 236, 0.6);
+}
+
+.c2s-retro .c2s-error-title {
+    color: #EEEDFE;
+}
+
+.c2s-retro .c2s-error-hint {
+    color: rgba(175, 169, 236, 0.5);
+}

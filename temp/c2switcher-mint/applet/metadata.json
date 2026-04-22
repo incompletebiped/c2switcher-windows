@@ -1,0 +1,8 @@
+{
+    "uuid": "c2switcher@c2switcher-mint",
+    "name": "Claude Code Usage",
+    "description": "Monitor Claude Code usage across all accounts and switch between them",
+    "icon": "utilities-system-monitor",
+    "version": "1.0.0",
+    "cinnamon-version": ["5.4", "5.6", "5.8", "6.0", "6.2", "6.4"]
+}

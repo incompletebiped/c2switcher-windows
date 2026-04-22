@@ -1,0 +1,38 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="256" height="256" viewBox="0 0 256 256">
+  <!--
+    C2Switcher Tray Icon — Master SVG (256x256)
+    Design intent documented in ICON_SPEC.md
+
+    This file represents the STATIC base icon (account 2 active, status = ok).
+    At runtime, the active row and status dot are drawn dynamically via GDI+.
+    See ICON_SPEC.md for full rendering spec.
+  -->
+
+  <!-- Background -->
+  <rect width="256" height="256" rx="56" fill="#26215C"/>
+
+  <!-- Account row 1 — inactive -->
+  <rect x="32" y="32" width="192" height="56" rx="12" fill="#534AB7"/>
+  <circle cx="60" cy="60" r="16" fill="#EEEDFE"/>
+  <rect x="86" y="52" width="90" height="8" rx="4" fill="#AFA9EC"/>
+  <rect x="86" y="66" width="58" height="6" rx="3" fill="#534AB7" opacity="0.5"/>
+
+  <!-- Account row 2 — active (brightest) -->
+  <rect x="32" y="96" width="192" height="56" rx="12" fill="#7F77DD"/>
+  <circle cx="60" cy="124" r="16" fill="#EEEDFE"/>
+  <rect x="86" y="116" width="90" height="8" rx="4" fill="#EEEDFE"/>
+  <rect x="86" y="130" width="58" height="6" rx="3" fill="#EEEDFE" opacity="0.45"/>
+  <!-- Active indicator tick -->
+  <rect x="216" y="104" width="6" height="40" rx="3" fill="#EEEDFE" opacity="0.45"/>
+
+  <!-- Account row 3 — inactive (darkest) -->
+  <rect x="32" y="160" width="192" height="44" rx="12" fill="#3C3489"/>
+  <circle cx="60" cy="182" r="12" fill="#AFA9EC"/>
+  <rect x="82" y="178" width="72" height="7" rx="3" fill="#AFA9EC" opacity="0.55"/>
+
+  <!-- Status dot — dark halo ring so it reads on any taskbar bg -->
+  <circle cx="220" cy="220" r="28" fill="#26215C"/>
+  <!-- Status fill — swap this color at runtime -->
+  <!-- ok:    #639922   warn: #BA7517   limit: #E24B4A -->
+  <circle cx="220" cy="220" r="20" fill="#639922"/>
+</svg>
