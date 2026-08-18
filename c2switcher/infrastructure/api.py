@@ -20,6 +20,10 @@ class ClaudeAPI:
     def _get_headers(token: str) -> Dict[str, str]:
         headers = load_headers_config()
         headers['authorization'] = f'Bearer {token}'
+        # Force gzip/deflate regardless of what's cached in headers.json —
+        # installs from before this fix have 'br' baked into that file, and
+        # this process has no brotli decoder to read a brotli-compressed body.
+        headers['accept-encoding'] = 'gzip, deflate'
         return headers
 
     @staticmethod

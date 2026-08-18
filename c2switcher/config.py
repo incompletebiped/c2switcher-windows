@@ -13,7 +13,11 @@ def load_headers_config() -> Dict[str, str]:
     """Load headers configuration, creating defaults if missing."""
     default_headers = {
         'accept': 'application/json, text/plain, */*',
-        'accept-encoding': 'gzip, compress, deflate, br',
+        # No 'br': the bundled requests/urllib3 has no brotli decoder, and the
+        # Anthropic API now compresses oauth responses with brotli whenever a
+        # client advertises support for it — that left responses undecodable
+        # and broke JSON parsing for profile/usage requests.
+        'accept-encoding': 'gzip, deflate',
         'anthropic-beta': 'oauth-2025-04-20',
         'content-type': 'application/json',
         'user-agent': 'claude-code/2.0.20',

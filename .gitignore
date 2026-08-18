@@ -30,3 +30,6 @@ notes.md
 # Dependencies / embedded Python
 Lib/
 share/
+
+# GitShift personal account configuration
+**/github-accounts.json

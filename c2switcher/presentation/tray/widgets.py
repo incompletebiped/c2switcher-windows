@@ -474,7 +474,7 @@ class AccountCard(QWidget):
         dot = QWidget()
         dot.setFixedSize(8, 8)
         dot.setStyleSheet(f'background-color: {dot_color}; border-radius: 4px;')
-        outer.addWidget(dot, 0, Qt.AlignmentFlag.AlignTop)
+        outer.addWidget(dot, 0, Qt.AlignmentFlag.AlignVCenter)
 
         # Account info (nickname + email)
         info = QVBoxLayout()
