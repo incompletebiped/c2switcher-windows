@@ -33,3 +33,6 @@ share/
 
 # GitShift personal account configuration
 **/github-accounts.json
+
+# Vendored upstream copy — removed; kept ignored so it cannot come back
+temp/
