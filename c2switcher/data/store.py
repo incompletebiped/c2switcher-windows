@@ -9,6 +9,7 @@ from pathlib import Path
 from typing import Dict, List, Optional, Tuple
 
 from ..constants import C2SWITCHER_DIR, DB_PATH, DEFAULT_BURST_BUFFER
+from ..core.errors import StoreUnavailable
 from ..core.models import Account, Session, UsageSnapshot
 from ..infrastructure.crypto import encrypt as _encrypt, decrypt as _decrypt
 
@@ -50,7 +51,11 @@ class Store:
 
     def _init_connection(self):
         """Initialize database connection with required PRAGMAs."""
-        C2SWITCHER_DIR.mkdir(mode=0o700, parents=True, exist_ok=True)
+        try:
+            C2SWITCHER_DIR.mkdir(mode=0o700, parents=True, exist_ok=True)
+        except OSError as exc:
+            raise StoreUnavailable(self._unavailable_message(exc)) from exc
+
         try:
             import os
 
@@ -58,7 +63,12 @@ class Store:
         except OSError:
             pass
 
-        self.conn = sqlite3.connect(str(self.db_path), timeout=5, check_same_thread=False)
+        try:
+            self.conn = sqlite3.connect(str(self.db_path), timeout=5, check_same_thread=False)
+        except sqlite3.OperationalError as exc:
+            # Bare sqlite errors here read as "unable to open database file" plus a
+            # traceback, which says nothing about the directory being the problem.
+            raise StoreUnavailable(self._unavailable_message(exc)) from exc
         self.conn.row_factory = sqlite3.Row
 
         try:
@@ -82,6 +92,14 @@ class Store:
                     pass
 
         self._create_schema()
+
+    def _unavailable_message(self, exc: Exception) -> str:
+        return (
+            f'Cannot open the c2switcher store at {self.db_path}\n'
+            f'  {exc}\n'
+            f'The state directory is missing or not writable by this user. Either fix its\n'
+            f'permissions, or point c2switcher somewhere else by setting C2SWITCHER_HOME.'
+        )
 
     def _create_schema(self):
         """Ensure schema exists (unchanged from Database class)."""

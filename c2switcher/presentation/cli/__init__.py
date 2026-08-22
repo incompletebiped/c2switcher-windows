@@ -2,6 +2,8 @@
 
 import click
 
+from ...core.errors import StoreUnavailable
+from ..console import console
 from .accounts import add, list_accounts_cmd, current, force_refresh, remove_account_cmd, nickname_cmd, reorder_accounts_cmd
 from .switching import optimal, switch, cycle
 from .sessions_cmd import start_session_cmd, end_session, list_sessions, session_history
@@ -11,7 +13,18 @@ from .login import login
 from .apikey import apikey
 
 
-@click.group()
+class _CLIGroup(click.Group):
+    """Turns an unopenable store into one readable line instead of a traceback."""
+
+    def invoke(self, ctx):
+        try:
+            return super().invoke(ctx)
+        except StoreUnavailable as exc:
+            console.print(f'[red]{exc}[/red]')
+            ctx.exit(1)
+
+
+@click.group(cls=_CLIGroup)
 def cli():
     """Claude Code Account Switcher - Manage multiple Claude Code accounts."""
 

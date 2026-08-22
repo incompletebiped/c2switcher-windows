@@ -9,6 +9,12 @@ class C2SwitcherError(Exception):
     pass
 
 
+class StoreUnavailable(C2SwitcherError):
+    """The state directory or database cannot be opened."""
+
+    pass
+
+
 class NoAccountsAvailable(C2SwitcherError):
     """No accounts registered or all exhausted."""
 

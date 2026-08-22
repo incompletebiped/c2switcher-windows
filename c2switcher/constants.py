@@ -10,8 +10,15 @@ __all__ = ['console']
 
 # Paths — Windows: use %APPDATA%\c2switcher for the database/state,
 # but keep ~/.claude for credentials (Claude Code uses this on all platforms).
-_appdata = os.environ.get('APPDATA')
-C2SWITCHER_DIR = Path(_appdata) / 'c2switcher' if _appdata else Path.home() / '.c2switcher'
+# C2SWITCHER_HOME overrides the state directory: portable installs, tests, and
+# recovering from a default directory whose permissions have been broken (which
+# otherwise bricks every command, since the store is unopenable).
+_home_override = os.environ.get('C2SWITCHER_HOME')
+if _home_override:
+    C2SWITCHER_DIR = Path(_home_override).expanduser()
+else:
+    _appdata = os.environ.get('APPDATA')
+    C2SWITCHER_DIR = Path(_appdata) / 'c2switcher' if _appdata else Path.home() / '.c2switcher'
 
 DB_PATH = C2SWITCHER_DIR / 'store.db'
 LOCK_PATH = C2SWITCHER_DIR / '.lock'
