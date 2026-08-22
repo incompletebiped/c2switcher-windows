@@ -28,12 +28,16 @@ c2switcher = "c2switcher.__main__:main"
 
 [project.optional-dependencies]
 build = ["pyinstaller>=6.0.0"]
+dev = ["pytest>=8.0.0"]
 
 [tool.setuptools.packages.find]
 where = ["."]
 
 [tool.setuptools]
 include-package-data = true
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
 
 [tool.black]
 line-length = 120
@@ -42,6 +46,11 @@ skip-string-normalization = true
 
 [tool.ruff]
 line-length = 120
+
+[tool.ruff.lint]
+# Real-bug rules only. The wider style rule sets flag ~400 pre-existing
+# issues across the tree; turning them on is a separate cleanup.
+select = ["F", "E9"]
 
 [tool.ruff.format]
 quote-style = "single"
