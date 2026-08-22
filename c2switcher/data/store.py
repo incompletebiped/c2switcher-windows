@@ -495,6 +495,15 @@ class Store:
         """Delete an account and reindex remaining accounts consecutively from 0."""
         with self.conn:
             cursor = self.conn.cursor()
+            # usage_history holds a plain foreign key, so with PRAGMA foreign_keys ON the
+            # account delete is rejected outright once any usage has been recorded — which
+            # is every account that has ever been listed. sessions cascades to NULL itself;
+            # round_robin_state has no key and would keep pointing at the removed account.
+            cursor.execute('DELETE FROM usage_history WHERE account_uuid = ?', (account_uuid,))
+            cursor.execute(
+                'UPDATE round_robin_state SET last_account_uuid = NULL WHERE last_account_uuid = ?',
+                (account_uuid,),
+            )
             cursor.execute('DELETE FROM accounts WHERE uuid = ?', (account_uuid,))
             # Reindex remaining accounts to keep index_num consecutive
             cursor.execute('SELECT uuid FROM accounts ORDER BY index_num')
