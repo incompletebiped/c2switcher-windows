@@ -15,8 +15,13 @@ def _attach_console():
     if sys.platform == 'win32':
         try:
             import ctypes
-            ctypes.windll.kernel32.AttachConsole(-1)  # ATTACH_PARENT_PROCESS = -1
-            # Reopen stdout/stderr so print() and rich output reach the terminal
+            # Only take the streams over when we actually had to attach.  A process
+            # started from a terminal is already attached and AttachConsole fails —
+            # reopening CONOUT$ there sends output to a Win32 console that pipes,
+            # redirects, and MSYS terminals (Git Bash) cannot see, so `c2switcher ls`
+            # silently prints nothing.
+            if not ctypes.windll.kernel32.AttachConsole(-1):  # ATTACH_PARENT_PROCESS
+                return
             sys.stdout = open('CONOUT$', 'w', encoding='utf-8')
             sys.stderr = open('CONOUT$', 'w', encoding='utf-8')
         except Exception:
@@ -43,11 +48,6 @@ def _start_console_hider():
     user32 = ctypes.windll.user32
     pid = os.getpid()
 
-    HWND_BOTTOM = 1
-    SWP_NOMOVE     = 0x0002
-    SWP_NOSIZE     = 0x0001
-    SWP_NOACTIVATE = 0x0010
-    SWP_FLAGS = SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE
     SW_HIDE = 0
 
     WNDENUMPROC = ctypes.WINFUNCTYPE(

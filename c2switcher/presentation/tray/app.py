@@ -11,7 +11,7 @@ import threading
 from typing import Optional
 
 import pystray
-from PySide6.QtCore import QMetaObject, Qt, QTimer, Signal, QObject, Slot
+from PySide6.QtCore import QMetaObject, Qt, Signal, QObject, Slot
 from PySide6.QtWidgets import QApplication
 
 from .icons import render_tray_icon, worst_usage_status
@@ -95,7 +95,6 @@ class TrayApp:
 
     def _build_pystray_icon(self) -> pystray.Icon:
         """Build the pystray.Icon with right-click menu."""
-        from PIL import Image
         # render_tray_icon uses QSvgRenderer — safe here because QApplication
         # is already created before _build_pystray_icon is called.
         placeholder_img = render_tray_icon(-1, 'ok', 0)

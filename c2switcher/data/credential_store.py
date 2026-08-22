@@ -124,10 +124,14 @@ class CredentialStore:
                 if error_type == 'invalid_grant':
                     _alog('INVALID_GRANT', context='token_refresh', tok=_tok(refresh_token))
                     raise InvalidGrant(
-                        f'Refresh token expired or revoked. Re-authenticate with: c2switcher login'
+                        'Refresh token expired or revoked. Re-authenticate with: c2switcher login'
                     )
                 elif error_type:
+                    # error_description is the only field that says *why* — without it
+                    # every failure reads as a bare error code.
                     error_msg = f'Token refresh failed: {error_type}'
+                    if error_desc:
+                        error_msg += f' — {error_desc}'
             except (ValueError, KeyError):
                 pass
             raise TokenUnavailable(error_msg)

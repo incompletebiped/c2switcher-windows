@@ -6,27 +6,21 @@ ServiceFactory call on a QThreadPool worker so the UI stays responsive.
 
 from __future__ import annotations
 
-import json
-import threading
 from datetime import datetime, timezone
 from typing import Callable, Optional
 
-from PySide6.QtCore import Qt, QTimer, Signal, QObject, QRunnable, QThreadPool
-from PySide6.QtGui import QColor, QFont, QPainter, QPainterPath, QBrush, QPen
+from PySide6.QtCore import Qt, Signal, QObject, QRunnable, QThreadPool
+from PySide6.QtGui import QColor, QPainter, QPainterPath, QBrush
 from PySide6.QtWidgets import (
-    QFrame,
     QHBoxLayout,
     QLabel,
     QLineEdit,
     QPushButton,
-    QScrollArea,
-    QSizePolicy,
     QStackedWidget,
     QVBoxLayout,
     QWidget,
 )
 
-from .themes import THEMES
 
 
 # ── Helpers ───────────────────────────────────────────────────────────────────

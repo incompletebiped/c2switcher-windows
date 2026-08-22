@@ -18,9 +18,8 @@ from typing import Callable, Optional
 
 import psutil
 
-from ...constants import CREDENTIALS_PATH, CREDENTIALS_PATH as _CRED_PATH, STATUS_CACHE_PATH
+from ...constants import CREDENTIALS_PATH, STATUS_CACHE_PATH
 from ...infrastructure.factory import ServiceFactory
-from ...infrastructure.locking import acquire_lock
 
 # ── Tuning constants ─────────────────────────────────────────────────────────
 
@@ -32,16 +31,45 @@ RATE_LIMIT_THRESHOLD = 95.0         # % that triggers auto-switch
 CRED_DEBOUNCE_SECONDS = 1.5         # wait after mtime change before reading
 
 
+# Substring-matching 'claude' against a whole command line also catches the Claude
+# desktop app, its Chrome native host, and any process whose working directory happens
+# to be named something like C:\...\CLAUDE-project.  The desktop app is the damaging
+# one: it holds long-lived API connections that churn constantly, which pins the
+# processing lock on and leaves switching permanently blocked.
+_DESKTOP_APP_MARKERS = (
+    r'\windowsapps\claude_',              # Microsoft Store build of the desktop app
+    r'\appdata\local\anthropicclaude',    # standalone desktop installer
+    r'\chromenativehost',                 # browser-extension helper
+)
+
+# npm / bun / yarn installs run Claude Code as `node .../@anthropic-ai/claude-code/cli.js`
+_CLI_CMDLINE_MARKERS = ('@anthropic-ai/claude-code', r'@anthropic-ai\claude-code')
+
+
+def is_claude_code_process(name: str, exe: str, cmdline: str) -> bool:
+    """True if this process is the Claude Code CLI (not the desktop app or a bystander)."""
+    exe = (exe or '').lower()
+    if any(marker in exe for marker in _DESKTOP_APP_MARKERS):
+        return False
+
+    # Native installer: ~\AppData\Roaming\Claude\claude-code\<version>\claude.exe
+    if r'\claude-code' in exe or '/claude-code' in exe:
+        return True
+
+    if (name or '').lower() in ('claude.exe', 'claude'):
+        return True
+
+    return any(marker in (cmdline or '').lower() for marker in _CLI_CMDLINE_MARKERS)
+
+
 def _get_claude_pids() -> list[int]:
-    """Return PIDs of all running claude / claude-code processes."""
+    """Return PIDs of running Claude Code CLI processes."""
     pids = []
     try:
-        for proc in psutil.process_iter(['pid', 'name', 'cmdline']):
+        for proc in psutil.process_iter(['pid', 'name', 'cmdline', 'exe']):
             try:
-                name = (proc.info.get('name') or '').lower()
-                cmdline = proc.info.get('cmdline') or []
-                cmdline_str = ' '.join(cmdline).lower()
-                if 'claude' in name or 'claude' in cmdline_str:
+                cmdline = ' '.join(proc.info.get('cmdline') or [])
+                if is_claude_code_process(proc.info.get('name'), proc.info.get('exe'), cmdline):
                     pids.append(proc.info['pid'])
             except (psutil.NoSuchProcess, psutil.AccessDenied):
                 pass
@@ -52,8 +80,8 @@ def _get_claude_pids() -> list[int]:
 
 def is_claude_processing(
     claude_pids: list[int],
-    prev_connections: frozenset,
-) -> tuple[bool, frozenset]:
+    prev_connections: Optional[frozenset],
+) -> tuple[bool, Optional[frozenset]]:
     """True if Claude's TCP connection set changed since last poll.
 
     HTTP/2 keeps connections ESTABLISHED even while idle, so checking for
@@ -61,10 +89,14 @@ def is_claude_processing(
     trigger only when the connection set changes (new connection, dropped
     connection, or a transitional state like SYN_SENT / CLOSE_WAIT).
 
+    prev_connections is None when no baseline has been sampled yet (tray
+    startup, or Claude not running); the first sample only establishes the
+    baseline rather than reporting a change against an empty set.
+
     Returns (is_active, current_connection_set).
     """
     if not claude_pids:
-        return False, frozenset()
+        return False, None
 
     pid_set = set(claude_pids)
     _TRANSITIONAL = {'SYN_SENT', 'SYN_RECV', 'CLOSE_WAIT',
@@ -92,7 +124,7 @@ def is_claude_processing(
         return False, prev_connections
 
     current = frozenset(established)
-    changed = current != prev_connections
+    changed = prev_connections is not None and current != prev_connections
     is_active = has_transitional or changed
     return is_active, current
 
@@ -112,7 +144,6 @@ def _fetch_usage_data() -> tuple[list[dict], Optional[str]]:
 
     new_active_refresh_token is set when the active account's credentials were rotated
     so the caller can update .credentials.json and _last_known_refresh_token."""
-    from datetime import datetime, timezone
     from ...infrastructure.api import ClaudeAPI
     from ...data.credential_store import CredentialStore
     from ...constants import CREDENTIALS_PATH as CPATH
@@ -334,7 +365,7 @@ class TrayMonitor:
         self._cred_changed_at: float = 0  # debounce timestamp
         self._pending_cred_check: bool = False
 
-        self._prev_connections: frozenset = frozenset()
+        self._prev_connections: Optional[frozenset] = None
 
         # Latest data snapshot (read from tray app, written from monitor thread)
         self._lock = threading.Lock()
@@ -467,12 +498,13 @@ class TrayMonitor:
             if not acc.get('is_active'):
                 continue
             usage = acc.get('usage') or {}
-            fh = (usage.get('five_hour') or {}).get('utilization')
-            sn = (usage.get('seven_day_sonnet') or {}).get('utilization')
-            if fh is not None and fh >= RATE_LIMIT_THRESHOLD:
-                return True
-            if sn is not None and sn >= RATE_LIMIT_THRESHOLD:
-                return True
+            # seven_day is the window the load balancer scores against first, so it has
+            # to count here too — without it an account maxed on the overall 7-day limit
+            # never triggers a switch.
+            for window in ('five_hour', 'seven_day', 'seven_day_sonnet'):
+                util = (usage.get(window) or {}).get('utilization')
+                if util is not None and util >= RATE_LIMIT_THRESHOLD:
+                    return True
         return False
 
     def _has_other_accounts(self) -> bool:

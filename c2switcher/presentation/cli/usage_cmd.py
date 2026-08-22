@@ -175,7 +175,7 @@ def usage(output_json: bool, force: bool):
                         'sessions': session_counts.get(acc.uuid, 0),
                     }
                 )
-            except InvalidGrant as exc:
+            except InvalidGrant:
                 display_name = acc.nickname or acc.email
                 console.print(f'[red]Re-authentication required for {display_name}[/red]')
                 store.set_needs_reauth(acc.uuid, True)

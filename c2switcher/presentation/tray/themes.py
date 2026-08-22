@@ -62,7 +62,6 @@ def load_theme_pref() -> str:
 def save_theme_pref(name: str):
     from ...constants import THEME_PREF_PATH
     try:
-        import json
         from ...utils import atomic_write_json
         atomic_write_json(THEME_PREF_PATH, {'theme': name})
     except Exception:

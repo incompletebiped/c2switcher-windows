@@ -218,7 +218,6 @@ class OAuthClient:
     def _dual_flow_login(self, code_verifier: str, code_challenge: str, state: str, auto_open: bool) -> Dict:
         """Dual flow: automatic localhost callback + manual fallback."""
         import threading
-        import time
 
         # Start HTTP server on random port
         server, port = self.start_callback_server(state)

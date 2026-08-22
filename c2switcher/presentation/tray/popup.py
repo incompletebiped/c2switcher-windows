@@ -10,19 +10,16 @@ from __future__ import annotations
 from typing import Optional
 
 from PySide6.QtCore import Qt, QTimer, Signal, Slot
-from PySide6.QtGui import QScreen
 from PySide6.QtWidgets import (
     QApplication,
     QFrame,
-    QHBoxLayout,
     QLabel,
     QScrollArea,
-    QSizePolicy,
     QVBoxLayout,
     QWidget,
 )
 
-from .themes import THEMES, load_theme_pref, save_theme_pref, DEFAULT_THEME
+from .themes import THEMES, load_theme_pref, save_theme_pref
 from .widgets import (
     AccountCard,
     HeaderBar,
